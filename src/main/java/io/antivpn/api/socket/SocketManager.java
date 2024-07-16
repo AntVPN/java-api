@@ -37,7 +37,7 @@ public class SocketManager  {
         if (this.isConnected()) return;
         this.socket.connect();
         Timer timer = new Timer(antiVPN.getPluginName() + " - Socket Timeout Checker");
-        timer.scheduleAtFixedRate(new SocketTimeoutTask(), 0, 8000);
+        timer.scheduleAtFixedRate(new SocketTimeoutTask(this), 0, 8000);
     }
 
     /**

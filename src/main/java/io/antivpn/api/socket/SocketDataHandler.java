@@ -79,4 +79,9 @@ public class SocketDataHandler {
 
         cache.invalidate(checkResponse.getUid());
     }
+
+    public void tick() {
+        this.cache.cleanUp();
+        this.checkedCache.cleanUp();
+    }
 }
