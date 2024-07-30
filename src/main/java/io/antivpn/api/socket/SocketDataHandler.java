@@ -6,6 +6,7 @@ import io.antivpn.api.data.socket.request.impl.CheckRequest;
 import io.antivpn.api.data.socket.request.impl.UserDataRequest;
 import io.antivpn.api.data.socket.response.impl.CheckResponse;
 import io.antivpn.api.exception.RequestTimeoutException;
+import io.antivpn.api.utils.Event;
 import io.antivpn.api.utils.GsonParser;
 
 import java.time.Duration;
@@ -63,10 +64,10 @@ public class SocketDataHandler {
         return completableFuture;
     }
 
-    public void sendUserData(String username, String uuid, String version, String address, String server, boolean connected, boolean premium) {
+    public void sendUserData(String username, String uuid, String version, String address, String server, Event event, boolean premium) {
         if (!this.socketManager.isConnected()) return;
 
-        this.socketManager.getSocket().send(GsonParser.toJson(new UserDataRequest(username, uuid, version, address, server, connected, premium)));
+        this.socketManager.getSocket().send(GsonParser.toJson(new UserDataRequest(username, uuid, version, address, server, event, premium)));
     }
 
     public void handle(CheckResponse checkResponse) {
