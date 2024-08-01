@@ -104,4 +104,13 @@
             <scope>compile</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/AntVPN/java-api</url>
+        </repository>
+    </distributionManagement>
+
 </project>
