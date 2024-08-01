@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.antivpn</groupId>
-    <artifactId>ServerAntiVPN-API</artifactId>
+    <artifactId>serverantivpn-api</artifactId>
     <version>1.0.0-RELEASE</version>
 
     <properties>
@@ -109,7 +109,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/AntVPN/java-api</url>
+            <url>https://maven.pkg.github.com/antvpn/java-api</url>
         </repository>
     </distributionManagement>
 
