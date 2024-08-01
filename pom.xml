@@ -107,9 +107,8 @@
 
     <distributionManagement>
         <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/antvpn/java-api</url>
+            <id>antivpn-releases</id>
+            <url>https://repo.antivpn.io/releases</url>
         </repository>
     </distributionManagement>
 
