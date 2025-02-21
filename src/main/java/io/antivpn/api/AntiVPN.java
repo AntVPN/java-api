@@ -31,7 +31,7 @@ public class AntiVPN {
     }
 
     public static AntiVPN create(String pluginName, VPNLogger vpnLogger, AntiVPNConfig antiVPNConfig, Duration cacheDuration) {
-        return new AntiVPN(pluginName, vpnLogger, antiVPNConfig, new Console(antiVPNConfig, vpnLogger, Level.FINE), cacheDuration);
+        return new AntiVPN(pluginName, vpnLogger, antiVPNConfig, new Console(antiVPNConfig, vpnLogger), cacheDuration);
     }
 
     public static AntiVPN create(String pluginName, VPNLogger vpnLogger, Console console, AntiVPNConfig antiVPNConfig, Duration cacheDuration) {

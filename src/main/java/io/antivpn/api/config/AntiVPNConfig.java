@@ -1,9 +1,12 @@
 package io.antivpn.api.config;
 
+import java.util.logging.Level;
+
 public class AntiVPNConfig {
     private String endpoint = "wss://connection.antivpn.io/live_checker";
     private String apiKey = "your-api-key-here";
     private boolean debug = false;
+    private Level level = Level.FINE;
 
     private AntiVPNConfig() {
     }
@@ -43,5 +46,9 @@ public class AntiVPNConfig {
 
     public boolean isDebug() {
         return this.debug;
+    }
+
+    public Level getLevel() {
+        return this.level;
     }
 }

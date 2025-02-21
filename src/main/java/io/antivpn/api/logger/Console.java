@@ -9,10 +9,9 @@ import java.util.logging.Level;
 public class Console {
     private final AntiVPNConfig antiVPNConfig;
     private final VPNLogger vpnLogger;
-    private final Level level;
 
     public void log(String message, Object... args) {
-        if (level.intValue() <= Level.INFO.intValue()) {
+        if (antiVPNConfig.getLevel().intValue() <= Level.INFO.intValue()) {
             this.vpnLogger.log(
                     placeholder(message, args)
             );
@@ -20,7 +19,7 @@ public class Console {
     }
 
     public void fine(String message, Object... args) {
-        if (level.intValue() <= Level.FINE.intValue()) {
+        if (antiVPNConfig.getLevel().intValue() <= Level.FINE.intValue()) {
             this.vpnLogger.fine(
                     placeholder(message, args)
             );
@@ -28,7 +27,7 @@ public class Console {
     }
 
     public void error(String message, Object... args) {
-        if (level.intValue() <= Level.SEVERE.intValue()) {
+        if (antiVPNConfig.getLevel().intValue() <= Level.SEVERE.intValue()) {
             this.vpnLogger.error(
                     placeholder(message, args)
             );
