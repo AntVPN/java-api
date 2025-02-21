@@ -8,6 +8,7 @@ import lombok.Getter;
 
 import java.time.Duration;
 import java.util.Timer;
+import java.util.logging.Level;
 
 @Getter
 public class AntiVPN {
@@ -30,7 +31,7 @@ public class AntiVPN {
     }
 
     public static AntiVPN create(String pluginName, VPNLogger vpnLogger, AntiVPNConfig antiVPNConfig, Duration cacheDuration) {
-        return new AntiVPN(pluginName, vpnLogger, antiVPNConfig, new Console(antiVPNConfig, vpnLogger), cacheDuration);
+        return new AntiVPN(pluginName, vpnLogger, antiVPNConfig, new Console(antiVPNConfig, vpnLogger, Level.FINE), cacheDuration);
     }
 
     public static AntiVPN create(String pluginName, VPNLogger vpnLogger, Console console, AntiVPNConfig antiVPNConfig, Duration cacheDuration) {
