@@ -46,6 +46,7 @@ public class SocketDataHandler {
      * If the player is already being checked, the cached CompletableFuture will be returned.
      * Therefor, if the player is already being checked, the CompletableFuture will be completed when the check is done.
      * If the player is not being checked, a new CompletableFuture will be created and returned.
+     *
      * @param checkRequest: The CheckRequest object to send to the socket server.
      * @return: A CompletableFuture with the CheckResponse object.
      */
@@ -64,10 +65,20 @@ public class SocketDataHandler {
         return completableFuture;
     }
 
-    public void sendUserData(String username, String uuid, String version, String address, String server, Event event, boolean premium) {
+    public void sendUserData(String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
         if (!this.socketManager.isConnected()) return;
 
-        this.socketManager.getSocket().send(GsonParser.toJson(new UserDataRequest(username, uuid, version, address, server, event, premium)));
+        this.socketManager.getSocket().send(GsonParser.toJson(
+                new UserDataRequest()
+                        .username(username)
+                        .uniqueId(uuid)
+                        .version(version)
+                        .address(address)
+                        .server(server)
+                        .hostname(hostname)
+                        .event(event.name())
+                        .premium(premium)
+        ));
     }
 
     public void handle(CheckResponse checkResponse) {
