@@ -31,6 +31,11 @@ public class AntiVPNConfig {
         return this;
     }
 
+    public AntiVPNConfig setLevel(Level level) {
+        this.level = level;
+        return this;
+    }
+
     public static AntiVPNConfig create() {
         return new AntiVPNConfig();
     }

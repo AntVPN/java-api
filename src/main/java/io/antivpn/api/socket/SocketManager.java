@@ -13,10 +13,10 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.concurrent.CompletionException;
 
-public class SocketManager  {
+public class SocketManager {
     private final AntiVPN antiVPN;
     @Getter
-    private final SocketClient socket;
+    private SocketClient socket;
     @Getter
     private final SocketDataHandler socketDataHandler;
 
@@ -88,9 +88,7 @@ public class SocketManager  {
         this.socket.close();
 
         if (this.socket.isConnecting() || this.isConnected()) return;
-        this.socket.clearHeaders();
-
-        getHeaders().forEach(this.socket::addHeader);
+        this.socket = initialize();
 
         this.antiVPN.getConsole().error("Reconnecting to the AntiVPN Server...");
         this.socket.reconnect();
