@@ -12,6 +12,7 @@ import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.logging.Level;
 
 public class SocketClient extends WebSocketClient {
     private final SocketManager socketManager;
@@ -54,6 +55,12 @@ public class SocketClient extends WebSocketClient {
                 SettingsResponse response = GsonParser.fromJson(settingsObject, SettingsResponse.class);
 
                 this.socketManager.setResponseKick(response.getKickMessage());
+
+                try {
+                    Level level = Level.parse(response.getLogLevel());
+                    this.antiVPN.getAntiVPNConfig().setLevel(level);
+                } catch (Exception ignored) {
+                }
                 this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
             } else if (object.get("type").getAsString().equalsIgnoreCase(ResponseType.VERIFY.name())) {
                 this.socketManager.getSocketDataHandler().handle(
