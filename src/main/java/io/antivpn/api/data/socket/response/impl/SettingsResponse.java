@@ -11,7 +11,7 @@ public class SettingsResponse {
     private final int enabled;
     private final String kickMessage;
     private final String shieldMode;
-    private final Date date;
+    private final Date updatedAt;
 
     public SettingsResponse() {
         this(1,
