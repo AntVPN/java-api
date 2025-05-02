@@ -56,11 +56,6 @@ public class SocketClient extends WebSocketClient {
 
                 this.socketManager.setResponseKick(response.getKickMessage());
 
-                try {
-                    Level level = Level.parse(response.getLogLevel());
-                    this.antiVPN.getAntiVPNConfig().setLevel(level);
-                } catch (Exception ignored) {
-                }
                 this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
             } else if (object.get("type").getAsString().equalsIgnoreCase(ResponseType.VERIFY.name())) {
                 this.socketManager.getSocketDataHandler().handle(

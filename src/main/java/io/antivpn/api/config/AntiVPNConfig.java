@@ -21,6 +21,11 @@ public class AntiVPNConfig {
         return this;
     }
 
+    public AntiVPNConfig withLoggingLevel(Level level) {
+        this.level = level;
+        return this;
+    }
+
     public AntiVPNConfig withApiKey(String apiKey) {
         this.apiKey = apiKey;
         return this;
