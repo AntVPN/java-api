@@ -24,12 +24,19 @@ public class SocketManager {
     @Setter
     private String responseKick;
 
+    @Getter
+    @Setter
+    private String shieldKick;
+
     public SocketManager(AntiVPN antiVPN, Duration cacheDuration) {
         this.antiVPN = antiVPN;
         this.socket = initialize();
         this.socketDataHandler = new SocketDataHandler(this, cacheDuration);
         this.responseKick = "§cVPN Detected!\n" +
                 "§cPlease disable your VPN and rejoin.\n" +
+                "§cIf you believe this is a mistake, please contact an administrator.";
+        this.shieldKick = "§cShield is enabled!\n" +
+                "§cPlease wait a couple minutes before joining.\n" +
                 "§cIf you believe this is a mistake, please contact an administrator.";
     }
 

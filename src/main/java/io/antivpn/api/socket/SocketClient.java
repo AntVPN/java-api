@@ -54,7 +54,9 @@ public class SocketClient extends WebSocketClient {
                 JsonObject settingsObject = object.get("settings").getAsJsonObject();
                 SettingsResponse response = GsonParser.fromJson(settingsObject, SettingsResponse.class);
 
-                this.socketManager.setResponseKick(response.getKickMessage());
+                // replace the CARRIAGE RETURN char with an empty string
+                this.socketManager.setResponseKick(response.getKickMessage().replace("\r", ""));
+                this.socketManager.setShieldKick(response.getShieldMode().replace("\r", ""));
 
                 this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
             } else if (object.get("type").getAsString().equalsIgnoreCase(ResponseType.VERIFY.name())) {
