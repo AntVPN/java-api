@@ -12,6 +12,7 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class UserDataRequest extends Request {
 
+    private String checkId;
     private String username;
     private String uniqueId;
     private String address;
@@ -25,8 +26,9 @@ public class UserDataRequest extends Request {
         super(RequestType.USER_DATA);
     }
 
-    public UserDataRequest(String username, String uniqueId, String version, String address, String hostname, String server, Event event, boolean premium) {
+    public UserDataRequest(String checkId, String username, String uniqueId, String version, String address, String hostname, String server, Event event, boolean premium) {
         super(RequestType.USER_DATA);
+        this.checkId = checkId;
         this.username = username;
         this.uniqueId = uniqueId;
         this.version = version;

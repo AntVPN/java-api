@@ -59,17 +59,18 @@ public class SocketDataHandler {
         }
 
         CompletableFuture<CheckResponse> completableFuture = new CompletableFuture<>();
-        this.cache.put(checkRequest.getUid(), completableFuture);
+        this.cache.put(checkRequest.getTransactional_id(), completableFuture);
         this.checkedCache.put(checkRequest.getAddress(), completableFuture);
         this.socketManager.getSocket().send(GsonParser.toJson(checkRequest));
         return completableFuture;
     }
 
-    public void sendUserData(String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
+    public void sendUserData(String checkId, String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
         if (!this.socketManager.isConnected()) return;
 
         this.socketManager.getSocket().send(GsonParser.toJson(
                 new UserDataRequest()
+                        .checkId(checkId)
                         .username(username)
                         .uniqueId(uuid)
                         .version(version)
@@ -82,14 +83,14 @@ public class SocketDataHandler {
     }
 
     public void handle(CheckResponse checkResponse) {
-        CompletableFuture<?> completableFuture = this.cache.getIfPresent(checkResponse.getUid());
+        CompletableFuture<?> completableFuture = this.cache.getIfPresent(checkResponse.getTransactional_id());
         if (completableFuture == null) return;
 
         @SuppressWarnings("unchecked")
         CompletableFuture<CheckResponse> checkResponseFuture = (CompletableFuture<CheckResponse>) completableFuture;
         checkResponseFuture.complete(checkResponse);
 
-        cache.invalidate(checkResponse.getUid());
+        cache.invalidate(checkResponse.getTransactional_id());
     }
 
     public void tick() {

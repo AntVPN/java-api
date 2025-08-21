@@ -7,13 +7,13 @@ import lombok.Getter;
 
 @Getter
 public class CheckRequest extends Request {
-    private final String uid;
+    private final String transactional_id;
     private final String address;
     private final String username;
 
     public CheckRequest(String address, String username) {
         super(RequestType.VERIFY);
-        this.uid = IDGenerator.generateUniqueID();
+        this.transactional_id = IDGenerator.generateUniqueID();
         this.address = address;
         this.username = username;
     }
