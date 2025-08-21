@@ -70,9 +70,9 @@ public class SocketDataHandler {
 
         this.socketManager.getSocket().send(GsonParser.toJson(
                 new UserDataRequest()
-                        .checkId(checkId)
+                        .sessionId(checkId)
                         .username(username)
-                        .uniqueId(uuid)
+                        .userId(uuid)
                         .version(version)
                         .address(address)
                         .server(server)

@@ -12,9 +12,9 @@ import lombok.experimental.Accessors;
 @Accessors(fluent = true)
 public class UserDataRequest extends Request {
 
-    private String checkId;
+    private String sessionId;
     private String username;
-    private String uniqueId;
+    private String userId;
     private String address;
     private String hostname;
     private String server;
@@ -26,11 +26,11 @@ public class UserDataRequest extends Request {
         super(RequestType.USER_DATA);
     }
 
-    public UserDataRequest(String checkId, String username, String uniqueId, String version, String address, String hostname, String server, Event event, boolean premium) {
+    public UserDataRequest(String sessionId, String username, String userId, String version, String address, String hostname, String server, Event event, boolean premium) {
         super(RequestType.USER_DATA);
-        this.checkId = checkId;
+        this.sessionId = sessionId;
         this.username = username;
-        this.uniqueId = uniqueId;
+        this.userId = userId;
         this.version = version;
         this.address = address;
         this.hostname = hostname;
