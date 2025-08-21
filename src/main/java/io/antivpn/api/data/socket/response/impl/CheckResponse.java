@@ -10,7 +10,7 @@ public class CheckResponse {
     private String username;
     private String ip;
     private String country;
-    private String kick_message;
+    private String kickMessage;
 
     private boolean valid;
     @SerializedName("is_attack")
@@ -19,7 +19,7 @@ public class CheckResponse {
     public String toString() {
         return String.format(
                 "DataResponse(transactional_id=%s, check_id=%s, username=%s, ip=%s, country=%s, kick_message=%s, valid=%s, is_attack=%s)",
-                this.transactionalId, this.checkId, this.username, this.ip, this.country, this.kick_message, this.valid, this.isAttack
+                this.transactionalId, this.checkId, this.username, this.ip, this.country, this.kickMessage, this.valid, this.isAttack
         );
     }
 }
