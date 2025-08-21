@@ -23,7 +23,7 @@ public class SocketDataHandler {
     public static final RequestTimeoutException requestTimeoutException = new RequestTimeoutException();
 
     private final Cache<String, CompletableFuture<?>> cache = CacheBuilder.newBuilder()
-            .expireAfterWrite(Duration.ofSeconds(30))
+            .expireAfterWrite(Duration.ofSeconds(5))
             .removalListener(notification -> {
                 CompletableFuture<?> completableFuture = (CompletableFuture<?>) notification.getValue();
                 if (completableFuture == null) return;
