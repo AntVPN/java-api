@@ -83,14 +83,14 @@ public class SocketDataHandler {
     }
 
     public void handle(CheckResponse checkResponse) {
-        CompletableFuture<?> completableFuture = this.cache.getIfPresent(checkResponse.getTransactional_id());
+        CompletableFuture<?> completableFuture = this.cache.getIfPresent(checkResponse.getTransactionalId());
         if (completableFuture == null) return;
 
         @SuppressWarnings("unchecked")
         CompletableFuture<CheckResponse> checkResponseFuture = (CompletableFuture<CheckResponse>) completableFuture;
         checkResponseFuture.complete(checkResponse);
 
-        cache.invalidate(checkResponse.getTransactional_id());
+        cache.invalidate(checkResponse.getTransactionalId());
     }
 
     public void tick() {
