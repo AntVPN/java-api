@@ -59,7 +59,7 @@ public class SocketDataHandler {
         }
 
         CompletableFuture<CheckResponse> completableFuture = new CompletableFuture<>();
-        this.cache.put(checkRequest.getTransactional_id(), completableFuture);
+        this.cache.put(checkRequest.getTransactionalId(), completableFuture);
         this.checkedCache.put(checkRequest.getAddress(), completableFuture);
         this.socketManager.getSocket().send(GsonParser.toJson(checkRequest));
         return completableFuture;
