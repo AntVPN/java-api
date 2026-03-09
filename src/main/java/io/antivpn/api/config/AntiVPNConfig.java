@@ -3,7 +3,7 @@ package io.antivpn.api.config;
 import java.util.logging.Level;
 
 public class AntiVPNConfig {
-    private String endpoint = "wss://connection.antivpn.io/live_checker";
+    private String endpoint = "wss://api.antivpn.io/connect";
     private String apiKey = "your-api-key-here";
     private boolean debug = false;
     private Level level = Level.FINE;
@@ -12,7 +12,7 @@ public class AntiVPNConfig {
     }
 
     public AntiVPNConfig withDefaultEndpoint() {
-        this.endpoint = "wss://connection.antivpn.io/live_checker";
+        this.endpoint = "wss://api.antivpn.io/connect";
         return this;
     }
 
