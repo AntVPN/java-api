@@ -65,12 +65,12 @@ public class SocketDataHandler {
         return completableFuture;
     }
 
-    public void sendUserData(String checkId, String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
+    public void sendUserData(String sessionId, String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
         if (!this.socketManager.isConnected()) return;
 
-        this.socketManager.getSocket().send(GsonParser.toJson(
+        String json = GsonParser.toJson(
                 new UserDataRequest()
-                        .sessionId(checkId)
+                        .sessionId(sessionId)
                         .username(username)
                         .userId(uuid)
                         .version(version)
@@ -79,7 +79,10 @@ public class SocketDataHandler {
                         .hostname(hostname)
                         .event(event.name())
                         .premium(premium)
-        ));
+        );
+
+        System.out.println(json);
+        this.socketManager.getSocket().send(json);
     }
 
     public void handle(CheckResponse checkResponse) {

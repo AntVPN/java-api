@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 public class CheckResponse {
     private String transactionalId;
-    private String checkId;
+    private String sessionId;
     private String username;
     private String ip;
     private String country;
@@ -19,7 +19,7 @@ public class CheckResponse {
     public String toString() {
         return String.format(
                 "DataResponse(transactional_id=%s, check_id=%s, username=%s, ip=%s, country=%s, kick_message=%s, valid=%s, is_attack=%s)",
-                this.transactionalId, this.checkId, this.username, this.ip, this.country, this.kickMessage, this.valid, this.isAttack
+                this.transactionalId, this.sessionId, this.username, this.ip, this.country, this.kickMessage, this.valid, this.isAttack
         );
     }
 }
