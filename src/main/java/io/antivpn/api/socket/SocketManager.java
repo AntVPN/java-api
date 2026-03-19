@@ -1,6 +1,7 @@
 package io.antivpn.api.socket;
 
 import io.antivpn.api.AntiVPN;
+import io.antivpn.api.utils.IDGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import org.java_websocket.framing.CloseFrame;
@@ -85,10 +86,11 @@ public class SocketManager {
         return this.socket.isConnected();
     }
 
-    public void sendPing() {
+    public void sendKeepAlive() {
         if (!this.isConnected()) return;
-        this.socket.sendPing();
+        this.socket.send("{\"type\":\"PING\",\"nonce\":\"" + IDGenerator.generateUniqueID() + "\"}");
     }
+
 
     public void reconnect() {
         this.antiVPN.getConsole().log("Closing the AntiVPN Server connection...");

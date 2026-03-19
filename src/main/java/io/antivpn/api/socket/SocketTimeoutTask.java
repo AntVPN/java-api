@@ -14,18 +14,19 @@ import java.util.TimerTask;
 @RequiredArgsConstructor
 public class SocketTimeoutTask extends TimerTask {
     private final SocketManager socketManager;
+    private long tickCount = 0;
 
     @Override
     public void run() {
         this.socketManager.getSocketDataHandler().tick();
 
-        // Already connected to the socket, so ping the server.
-        if (this.socketManager.isConnected()) {
-            this.socketManager.sendPing();
-            return;
+        if (!this.socketManager.isConnected()) {
+            this.socketManager.reconnect();
         }
 
-        // Not connected to the socket, so try to reconnect.
-        this.socketManager.reconnect();
+        // Only send keepalive every ~56s (8s interval × 7 ticks)
+        if (++tickCount % 7 == 0) {
+            this.socketManager.sendKeepAlive();
+        }
     }
 }

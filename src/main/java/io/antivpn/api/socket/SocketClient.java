@@ -1,101 +1,131 @@
 package io.antivpn.api.socket;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.antivpn.api.AntiVPN;
-import io.antivpn.api.data.socket.response.ResponseType;
 import io.antivpn.api.data.socket.response.impl.CheckResponse;
 import io.antivpn.api.data.socket.response.impl.SettingsResponse;
 import io.antivpn.api.utils.GsonParser;
-import lombok.Getter;
 import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.enums.ReadyState;
 import org.java_websocket.handshake.ServerHandshake;
 
+import java.net.ConnectException;
 import java.net.URI;
+import java.net.UnknownHostException;
+import java.nio.channels.UnresolvedAddressException;
 import java.util.Map;
-import java.util.logging.Level;
 
 public class SocketClient extends WebSocketClient {
     private final SocketManager socketManager;
     private final AntiVPN antiVPN;
-    @Getter
-    private boolean connecting = true;
 
     public SocketClient(SocketManager socketManager, AntiVPN antiVPN, URI serverUri, Map<String, String> httpHeaders) {
         super(serverUri, httpHeaders);
         this.socketManager = socketManager;
         this.antiVPN = antiVPN;
         this.setTcpNoDelay(true);
-    }
-
-    @Override
-    public void connect() {
-        this.connecting = true;
-        super.connect();
-    }
-
-    @Override
-    public void reconnect() {
-        this.connecting = true;
-        super.reconnect();
+        this.setConnectionLostTimeout(30);
     }
 
     @Override
     public void onMessage(String message) {
-        this.antiVPN.getConsole().debug("Received message from the AntiVPN Server. (Message: %s)", message);
+        this.antiVPN.getConsole().debug("Received message from the AntiVPN Server: %s", message);
         try {
             JsonObject object = GsonParser.parse(message);
+            JsonElement typeElement = object.get("type");
 
-            if (!object.has("type")) {
-                this.antiVPN.getConsole().error("Received invalid message from the AntiVPN Server. (Message: %s)", message);
+            if (typeElement == null) {
+                this.antiVPN.getConsole().error("Received invalid message (missing 'type'): %s", message);
                 return;
             }
 
-            if (object.get("type").getAsString().equalsIgnoreCase(ResponseType.SETTINGS.name())) {
-                JsonObject settingsObject = object.get("settings").getAsJsonObject();
-                SettingsResponse response = GsonParser.fromJson(settingsObject, SettingsResponse.class);
+            String type = typeElement.getAsString().toUpperCase();
 
-                // replace the CARRIAGE RETURN char with an empty string
-                this.socketManager.setResponseKick(response.getKickMessage().replace("\r", ""));
-                this.socketManager.setShieldKick(response.getShieldMode().replace("\r", ""));
+            switch (type) {
+                case "SETTINGS":
+                    JsonObject settingsObject = object.getAsJsonObject("settings");
+                    // Use the already parsed JsonObject instead of a String
+                    SettingsResponse response = GsonParser.fromJson(settingsObject, SettingsResponse.class);
 
-                this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
-            } else if (object.get("type").getAsString().equalsIgnoreCase(ResponseType.VERIFY.name())) {
-                this.socketManager.getSocketDataHandler().handle(
-                        GsonParser.fromJson(message, CheckResponse.class)
-                );
-            } else {
-                this.antiVPN.getConsole().error("Received invalid message from the AntiVPN Server. (Message: %s)", message);
+                    this.socketManager.setResponseKick(response.getKickMessage().replace("\r", ""));
+                    this.socketManager.setShieldKick(response.getShieldMode().replace("\r", ""));
+                    this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
+                    break;
+
+                case "VERIFY":
+                    // Avoid parsing the full string a second time, pass the JsonObject directly
+                    CheckResponse checkResponse = GsonParser.fromJson(object, CheckResponse.class);
+                    this.socketManager.getSocketDataHandler().handle(checkResponse);
+                    break;
+
+                default:
+                    this.antiVPN.getConsole().error("Received unknown message type '%s': %s", type, message);
+                    break;
             }
         } catch (Exception e) {
-            this.antiVPN.getConsole().error("An error occurred while parsing the message from the AntiVPN Server. (Message: %s)", message);
-            this.antiVPN.getConsole().error("Error: %s", e.getMessage());
+            this.antiVPN.getConsole().error("Failed to parse message from AntiVPN Server: %s | Error: %s", message, e.getMessage());
         }
     }
 
     @Override
     public void onOpen(ServerHandshake handshake) {
-        this.connecting = false;
         this.antiVPN.getConsole().fine("Connected to the AntiVPN Server.");
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        this.connecting = false;
-        if (reason == null || reason.isEmpty()) reason = "Unknown";
+        String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
+        String initiator = remote ? "Server" : "Client";
 
-        this.antiVPN.getConsole().error("Disconnected from the AntiVPN Server. (Code: %s, Reason: %s)", code, reason);
-        this.close();
+        this.antiVPN.getConsole().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
+        // this.close() was removed because it is redundant to call it inside onClose
     }
 
     @Override
     public void onError(Exception e) {
-        this.connecting = false;
-        this.antiVPN.getConsole().error("An error occurred, please report this to the developer. (Error: %s)", e.getMessage());
-        e.printStackTrace();
+        String errorMsg;
+
+        // Specific handling of common network errors for better console clarity
+        if (e instanceof ConnectException) {
+            errorMsg = "Connection refused. The AntiVPN socket server might be offline or blocked by a firewall.";
+        } else if (e instanceof UnknownHostException || e instanceof UnresolvedAddressException) {
+            errorMsg = "Unknown host. Please check your server URI or DNS settings.";
+        } else {
+            errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            // Only print the stacktrace if it's an unexpected error
+            e.printStackTrace();
+        }
+
+        this.antiVPN.getConsole().error("Socket connection error: %s", errorMsg);
     }
 
+    /**
+     * Returns true if the socket is currently in the process of connecting.
+     */
+    public boolean isConnecting() {
+        return this.getReadyState() == ReadyState.NOT_YET_CONNECTED;
+    }
+
+    /**
+     * Returns true if the socket is fully connected and open.
+     */
     public boolean isConnected() {
-        if (this.isClosed()) return false;
-        return this.isOpen() && !this.isClosing();
+        return this.isOpen(); // isOpen() safely validates the state
+    }
+
+    /**
+     * Translates standard WebSocket close codes to human-readable text.
+     */
+    private String getReadableCloseReason(int code) {
+        switch (code) {
+            case 1000: return "Normal Closure";
+            case 1001: return "Going Away (Server Restarting)";
+            case 1005: return "No Status Received";
+            case 1006: return "Abnormal Closure (Network Drop / Connection Refused)";
+            case 1011: return "Internal Server Error";
+            case 1015: return "TLS Handshake Failure";
+            default: return "Unknown (" + code + ")";
+        }
     }
 }
