@@ -81,7 +81,6 @@ public class SocketDataHandler {
                         .premium(premium)
         );
 
-        System.out.println(json);
         this.socketManager.getSocket().send(json);
     }
 
