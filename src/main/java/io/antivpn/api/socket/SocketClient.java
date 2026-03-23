@@ -59,6 +59,10 @@ public class SocketClient extends WebSocketClient {
                     this.socketManager.getSocketDataHandler().handle(checkResponse);
                     break;
 
+                case "PONG":
+                    // Ignore PONG messages, they are used for keepalive
+                    break;
+
                 default:
                     this.antiVPN.getConsole().error("Received unknown message type '%s': %s", type, message);
                     break;
