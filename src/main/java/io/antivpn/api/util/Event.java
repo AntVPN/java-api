@@ -1,6 +1,5 @@
-package io.antivpn.api.utils;
+package io.antivpn.api.util;
 
-@Deprecated
 public enum Event {
     PLAYER_JOIN, PLAYER_SWITCH, PLAYER_QUIT,
 }

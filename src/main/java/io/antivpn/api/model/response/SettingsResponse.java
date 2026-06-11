@@ -1,4 +1,4 @@
-package io.antivpn.api.data.socket.response.impl;
+package io.antivpn.api.model.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,7 +7,6 @@ import java.util.Date;
 
 @Data
 @AllArgsConstructor
-@Deprecated
 public class SettingsResponse {
     private final int enabled;
     private final String kickMessage;

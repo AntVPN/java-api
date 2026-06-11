@@ -1,8 +1,6 @@
-package io.antivpn.api.data.socket.request.impl;
+package io.antivpn.api.model.request;
 
-import io.antivpn.api.data.socket.request.Request;
-import io.antivpn.api.data.socket.request.RequestType;
-import io.antivpn.api.utils.Event;
+import io.antivpn.api.util.Event;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -10,7 +8,6 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(fluent = true)
-@Deprecated
 public class UserDataRequest extends Request {
 
     private String sessionId;

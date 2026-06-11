@@ -1,12 +1,9 @@
-package io.antivpn.api.data.socket.request.impl;
+package io.antivpn.api.model.request;
 
-import io.antivpn.api.data.socket.request.Request;
-import io.antivpn.api.data.socket.request.RequestType;
-import io.antivpn.api.utils.IDGenerator;
+import io.antivpn.api.util.IDGenerator;
 import lombok.Getter;
 
 @Getter
-@Deprecated
 public class CheckRequest extends Request {
     private final String transactionalId;
     private final String address;

@@ -1,4 +1,4 @@
-package io.antivpn.api.utils;
+package io.antivpn.api.util;
 
 import java.security.SecureRandom;
 import java.util.Random;
@@ -12,7 +12,6 @@ import java.util.Random;
  * - a 3-byte counter, starting with a random value.
  * <p>
  */
-@Deprecated
 public class IDGenerator {
     private static final int TIMESTAMP_BYTES = 4;
     private static final int RANDOM_BYTES = 5;

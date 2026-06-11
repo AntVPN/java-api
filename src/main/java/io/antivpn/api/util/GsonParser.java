@@ -1,4 +1,4 @@
-package io.antivpn.api.utils;
+package io.antivpn.api.util;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -9,7 +9,6 @@ import lombok.experimental.UtilityClass;
  * This class is used to parse json using Google's Gson library.
  */
 @UtilityClass
-@Deprecated
 public class GsonParser {
 
     /**

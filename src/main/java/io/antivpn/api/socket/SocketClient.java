@@ -3,9 +3,9 @@ package io.antivpn.api.socket;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.antivpn.api.AntiVPN;
-import io.antivpn.api.data.socket.response.impl.CheckResponse;
-import io.antivpn.api.data.socket.response.impl.SettingsResponse;
-import io.antivpn.api.utils.GsonParser;
+import io.antivpn.api.model.response.CheckResponse;
+import io.antivpn.api.model.response.SettingsResponse;
+import io.antivpn.api.util.GsonParser;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.enums.ReadyState;
 import org.java_websocket.handshake.ServerHandshake;
@@ -30,13 +30,13 @@ public class SocketClient extends WebSocketClient {
 
     @Override
     public void onMessage(String message) {
-        this.antiVPN.getConsole().debug("Received message from the AntiVPN Server: %s", message);
+        this.antiVPN.getLog().debug("Received message from the AntiVPN Server: %s", message);
         try {
             JsonObject object = GsonParser.parse(message);
             JsonElement typeElement = object.get("type");
 
             if (typeElement == null) {
-                this.antiVPN.getConsole().error("Received invalid message (missing 'type'): %s", message);
+                this.antiVPN.getLog().error("Received invalid message (missing 'type'): %s", message);
                 return;
             }
 
@@ -50,7 +50,7 @@ public class SocketClient extends WebSocketClient {
 
                     this.socketManager.setResponseKick(response.getKickMessage().replace("\r", ""));
                     this.socketManager.setShieldKick(response.getShieldMode().replace("\r", ""));
-                    this.antiVPN.getConsole().fine("Received settings from the AntiVPN Server.");
+                    this.antiVPN.getLog().fine("Received settings from the AntiVPN Server.");
                     break;
 
                 case "VERIFY":
@@ -64,17 +64,17 @@ public class SocketClient extends WebSocketClient {
                     break;
 
                 default:
-                    this.antiVPN.getConsole().error("Received unknown message type '%s': %s", type, message);
+                    this.antiVPN.getLog().error("Received unknown message type '%s': %s", type, message);
                     break;
             }
         } catch (Exception e) {
-            this.antiVPN.getConsole().error("Failed to parse message from AntiVPN Server: %s | Error: %s", message, e.getMessage());
+            this.antiVPN.getLog().error("Failed to parse message from AntiVPN Server: %s | Error: %s", message, e.getMessage());
         }
     }
 
     @Override
     public void onOpen(ServerHandshake handshake) {
-        this.antiVPN.getConsole().fine("Connected to the AntiVPN Server.");
+        this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
     }
 
     @Override
@@ -82,7 +82,7 @@ public class SocketClient extends WebSocketClient {
         String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
         String initiator = remote ? "Server" : "Client";
 
-        this.antiVPN.getConsole().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
+        this.antiVPN.getLog().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
         // this.close() was removed because it is redundant to call it inside onClose
     }
 
@@ -101,7 +101,7 @@ public class SocketClient extends WebSocketClient {
             e.printStackTrace();
         }
 
-        this.antiVPN.getConsole().error("Socket connection error: %s", errorMsg);
+        this.antiVPN.getLog().error("Socket connection error: %s", errorMsg);
     }
 
     /**

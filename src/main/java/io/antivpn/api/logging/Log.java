@@ -1,4 +1,4 @@
-package io.antivpn.api.logger;
+package io.antivpn.api.logging;
 
 import io.antivpn.api.config.AntiVPNConfig;
 import lombok.RequiredArgsConstructor;
@@ -6,8 +6,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.logging.Level;
 
 @RequiredArgsConstructor
-@Deprecated
-public class Console {
+public class Log {
     private final AntiVPNConfig antiVPNConfig;
     private final VPNLogger vpnLogger;
 
@@ -43,10 +42,6 @@ public class Console {
     }
 
     private String placeholder(String message, Object... args) {
-        // Add [ServerAntiVPN] prefix
-        message = "[ServerAntiVPN] " + message;
-
-        // Replace %s with args
         return String.format(message, args);
     }
 }

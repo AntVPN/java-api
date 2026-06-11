@@ -1,11 +1,10 @@
-package io.antivpn.api.data.socket.request;
+package io.antivpn.api.model.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data
 @AllArgsConstructor
-@Deprecated
 public class Request {
     private final RequestType type;
 }

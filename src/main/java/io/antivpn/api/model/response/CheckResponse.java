@@ -1,10 +1,9 @@
-package io.antivpn.api.data.socket.response.impl;
+package io.antivpn.api.model.response;
 
 import com.google.gson.annotations.SerializedName;
 import lombok.Data;
 
 @Data
-@Deprecated
 public class CheckResponse {
     private String transactionalId;
     private String sessionId;

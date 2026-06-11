@@ -1,10 +1,9 @@
-package io.antivpn.api.logger;
+package io.antivpn.api.logging;
 
 /**
  * This is a logger interface that is used to log messages to the console.
  */
-@Deprecated
-public interface VPNLogger {
+public interface VPNLogger extends io.antivpn.api.logger.VPNLogger {
     /**
      * Log a message to the console
      *

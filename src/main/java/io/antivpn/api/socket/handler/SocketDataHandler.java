@@ -1,25 +1,18 @@
-package io.antivpn.api.socket;
+package io.antivpn.api.socket.handler;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import io.antivpn.api.data.socket.request.impl.CheckRequest;
-import io.antivpn.api.data.socket.request.impl.UserDataRequest;
-import io.antivpn.api.data.socket.response.impl.CheckResponse;
+import io.antivpn.api.model.request.CheckRequest;
+import io.antivpn.api.model.request.UserDataRequest;
+import io.antivpn.api.model.request.UserData;
+import io.antivpn.api.model.response.CheckResponse;
 import io.antivpn.api.exception.RequestTimeoutException;
-import io.antivpn.api.utils.Event;
-import io.antivpn.api.utils.GsonParser;
+import io.antivpn.api.socket.SocketManager;
+import io.antivpn.api.util.GsonParser;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * This code has been created by
- * gatogamer#6666 A.K.A. gatogamer.
- * If you want to use my code, please
- * ask first, and give me the credits.
- * Arigato! n.n
- */
-@Deprecated
 public class SocketDataHandler {
     public static final RequestTimeoutException requestTimeoutException = new RequestTimeoutException();
 
@@ -66,20 +59,20 @@ public class SocketDataHandler {
         return completableFuture;
     }
 
-    public void sendUserData(String sessionId, String username, String uuid, String version, String address, String server, String hostname, Event event, boolean premium) {
+    public void sendUserData(UserData userData) {
         if (!this.socketManager.isConnected()) return;
 
         String json = GsonParser.toJson(
                 new UserDataRequest()
-                        .sessionId(sessionId)
-                        .username(username)
-                        .userId(uuid)
-                        .version(version)
-                        .address(address)
-                        .server(server)
-                        .hostname(hostname)
-                        .event(event.name())
-                        .premium(premium)
+                        .sessionId(userData.getSessionId())
+                        .username(userData.getUsername())
+                        .userId(userData.getUserId())
+                        .version(userData.getVersion())
+                        .address(userData.getAddress())
+                        .server(userData.getServer())
+                        .hostname(userData.getHostname())
+                        .event(userData.getEvent().name())
+                        .premium(userData.isPremium())
         );
 
         this.socketManager.getSocket().send(json);

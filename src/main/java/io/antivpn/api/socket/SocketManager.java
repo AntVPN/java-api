@@ -1,7 +1,8 @@
 package io.antivpn.api.socket;
 
 import io.antivpn.api.AntiVPN;
-import io.antivpn.api.utils.IDGenerator;
+import io.antivpn.api.socket.handler.SocketDataHandler;
+import io.antivpn.api.util.IDGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import org.java_websocket.framing.CloseFrame;
@@ -52,7 +53,7 @@ public class SocketManager {
      * Closing the socket.
      */
     public void close() {
-        if (this.isConnected()) return;
+        if (!this.isConnected()) return;
         this.socket.close(CloseFrame.NORMAL, "Closing");
     }
 
@@ -69,11 +70,11 @@ public class SocketManager {
             int statusCode = throwable.getResponse().statusCode();
 
             if (statusCode == 401) {
-                this.antiVPN.getConsole().error("Failed to authenticate with the server, please check your secret in the config.json file.");
+                this.antiVPN.getLog().error("Failed to authenticate with the server, please check your secret in the config.json file.");
             } else if (statusCode >= 500 && statusCode <= 505) {
-                this.antiVPN.getConsole().error("Our server is restarting or something related... If this still happening after 10 minutes please report it on discord.snake.rip. Useful data: (HttpStatus: %s)", statusCode);
+                this.antiVPN.getLog().error("Our server is restarting or something related... If this still happening after 10 minutes please report it on discord.snake.rip. Useful data: (HttpStatus: %s)", statusCode);
             } else {
-                this.antiVPN.getConsole().error("Report this to the developer: %s", throwable.getClass().getSimpleName());
+                this.antiVPN.getLog().error("Report this to the developer: %s", throwable.getClass().getSimpleName());
                 throwable.printStackTrace();
             }
 
@@ -93,22 +94,27 @@ public class SocketManager {
 
 
     public void reconnect() {
-        this.antiVPN.getConsole().log("Closing the AntiVPN Server connection...");
+        reconnect(false);
+    }
+
+    public void reconnect(boolean force) {
+        this.antiVPN.getLog().log("Closing the AntiVPN Server connection...");
         this.socket.close();
 
-        if (this.socket.isConnecting() || this.isConnected()) return;
+        if (!force && (this.socket.isConnecting() || this.isConnected())) return;
 
         this.socket.clearHeaders();
         getHeaders().forEach(this.socket::addHeader);
 
-        this.antiVPN.getConsole().error("Reconnecting to the AntiVPN Server...");
+        this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
         this.socket.reconnect();
     }
 
     public Map<String, String> getHeaders() {
         Map<String, String> httpHeaders = new HashMap<>();
 
-        httpHeaders.put("User-Agent", this.antiVPN.getPluginName());
+        String userAgent = this.antiVPN.getAntiVPNConfig().getUserAgent();
+        httpHeaders.put("User-Agent", userAgent != null ? userAgent : this.antiVPN.getPluginName());
         httpHeaders.put("Authorization", "Bearer " + this.antiVPN.getAntiVPNConfig().getApiKey());
 
         return httpHeaders;
