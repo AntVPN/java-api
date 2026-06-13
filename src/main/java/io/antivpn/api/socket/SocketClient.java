@@ -3,6 +3,7 @@ package io.antivpn.api.socket;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.antivpn.api.AntiVPN;
+import lombok.Getter;
 import io.antivpn.api.model.response.CheckResponse;
 import io.antivpn.api.model.response.SettingsResponse;
 import io.antivpn.api.util.GsonParser;
@@ -18,6 +19,7 @@ import java.util.Map;
 
 public class SocketClient extends WebSocketClient {
     private final SocketManager socketManager;
+    @Getter
     private final AntiVPN antiVPN;
 
     public SocketClient(SocketManager socketManager, AntiVPN antiVPN, URI serverUri, Map<String, String> httpHeaders) {
@@ -25,7 +27,10 @@ public class SocketClient extends WebSocketClient {
         this.socketManager = socketManager;
         this.antiVPN = antiVPN;
         this.setTcpNoDelay(true);
-        this.setConnectionLostTimeout(30);
+        // Disable library-level ping/pong; we use our own JSON keepalive in SocketTimeoutTask.
+        // The server replies to JSON PINGs but not to WebSocket control-frame PINGs, which
+        // caused Code: 1006 "did not respond with a pong in time" disconnects.
+        this.setConnectionLostTimeout(0);
     }
 
     @Override
@@ -60,7 +65,7 @@ public class SocketClient extends WebSocketClient {
                     break;
 
                 case "PONG":
-                    // Ignore PONG messages, they are used for keepalive
+                    this.antiVPN.getLog().debug("Received JSON PONG keepalive from server.");
                     break;
 
                 default:
@@ -75,6 +80,7 @@ public class SocketClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshake) {
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
+        this.antiVPN.getLog().debug("WebSocket handshake complete. Status: %d | Url: %s", handshake.getHttpStatus(), this.uri);
     }
 
     @Override
@@ -82,8 +88,8 @@ public class SocketClient extends WebSocketClient {
         String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
         String initiator = remote ? "Server" : "Client";
 
+        this.antiVPN.getLog().debug("onClose triggered [initiator=%s, code=%d, rawReason=%s]", initiator, code, reason);
         this.antiVPN.getLog().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
-        // this.close() was removed because it is redundant to call it inside onClose
     }
 
     @Override

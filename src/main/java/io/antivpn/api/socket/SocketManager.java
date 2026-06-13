@@ -89,7 +89,9 @@ public class SocketManager {
 
     public void sendKeepAlive() {
         if (!this.isConnected()) return;
-        this.socket.send("{\"type\":\"PING\",\"nonce\":\"" + IDGenerator.generateUniqueID() + "\"}");
+        String nonce = IDGenerator.generateUniqueID();
+        this.antiVPN.getLog().debug("Sending JSON PING keepalive [nonce=%s]", nonce);
+        this.socket.send("{\"type\":\"PING\",\"nonce\":\"" + nonce + "\"}");
     }
 
 

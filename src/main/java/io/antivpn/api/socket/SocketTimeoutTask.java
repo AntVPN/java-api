@@ -21,11 +21,13 @@ public class SocketTimeoutTask extends TimerTask {
         this.socketManager.getSocketDataHandler().tick();
 
         if (!this.socketManager.isConnected()) {
+            this.socketManager.getSocket().getAntiVPN().getLog().debug("SocketTimeoutTask: socket not connected, triggering reconnect. [tick=%d]", tickCount);
             this.socketManager.reconnect();
         }
 
         // Only send keepalive every ~56s (8s interval × 7 ticks)
         if (++tickCount % 7 == 0) {
+            this.socketManager.getSocket().getAntiVPN().getLog().debug("SocketTimeoutTask: sending keepalive [tick=%d]", tickCount);
             this.socketManager.sendKeepAlive();
         }
     }
