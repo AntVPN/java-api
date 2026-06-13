@@ -24,8 +24,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SocketClient extends WebSocketListener {
+    public static final String API_VERSION = "1.1.7-RELEASE";
+    public static final String API_MARKER = "ANTIVPN_API_OKHTTP_1_1_7_RELEASE";
+    public static final String SOCKET_IMPLEMENTATION = "OkHttp";
+
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .pingInterval(0, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .build();
 
@@ -62,6 +66,37 @@ public class SocketClient extends WebSocketListener {
             return source + " | " + (loader == null ? "bootstrap" : loader.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(loader)));
         } catch (Exception e) {
             return "unknown";
+        }
+    }
+
+    public static String apiRuntimeMarker() {
+        return "version=" + API_VERSION
+                + " | socket=" + SOCKET_IMPLEMENTATION
+                + " | marker=" + API_MARKER
+                + " | javaWebSocketVisible=" + isClassVisible("org.java_websocket.client.WebSocketClient")
+                + " | javaWebSocketSource=" + classSource("org.java_websocket.client.WebSocketClient")
+                + " | okHttpVisible=" + isClassVisible("okhttp3.OkHttpClient")
+                + " | runtime=" + runtimeFingerprint();
+    }
+
+    private static boolean isClassVisible(String name) {
+        try {
+            Class.forName(name, false, SocketClient.class.getClassLoader());
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String classSource(String name) {
+        try {
+            Class<?> clazz = Class.forName(name, false, SocketClient.class.getClassLoader());
+            if (clazz.getProtectionDomain() == null || clazz.getProtectionDomain().getCodeSource() == null) {
+                return "unknown";
+            }
+            return String.valueOf(clazz.getProtectionDomain().getCodeSource().getLocation());
+        } catch (Throwable ignored) {
+            return "not-visible";
         }
     }
 
@@ -126,6 +161,7 @@ public class SocketClient extends WebSocketListener {
         this.socketManager.markConnected();
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
         this.antiVPN.getLog().debug("OkHttp WebSocket handshake complete. Status: %d | Url: %s | Runtime: %s", response.code(), this.uri, runtimeFingerprint());
+        this.antiVPN.getLog().debug("OkHttp protocol-level ping enabled. Interval: %dms", CLIENT.pingIntervalMillis());
         this.connectLatch.countDown();
     }
 
@@ -209,13 +245,17 @@ public class SocketClient extends WebSocketListener {
 
     private void onError(Throwable e) {
         String errorMsg;
+        String message = e.getMessage();
 
         if (e instanceof ConnectException) {
             errorMsg = "Connection refused. The AntiVPN socket server might be offline or blocked by a firewall.";
         } else if (e instanceof UnknownHostException || e instanceof UnresolvedAddressException) {
             errorMsg = "Unknown host. Please check your server URI or DNS settings.";
+        } else if (message != null && message.toLowerCase().contains("ping")) {
+            this.antiVPN.getLog().error("OkHttp native ping failed: no pong received in time. %s", message);
+            errorMsg = message;
         } else {
-            errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            errorMsg = message != null ? message : e.getClass().getSimpleName();
             e.printStackTrace();
         }
 

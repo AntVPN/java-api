@@ -22,6 +22,7 @@ public class SocketManager {
     private final SocketDataHandler socketDataHandler;
     private final Object socketLock = new Object();
     private final AtomicBoolean reconnecting = new AtomicBoolean(false);
+    private final AtomicBoolean runtimeMarkerLogged = new AtomicBoolean(false);
     private final AtomicLong socketGeneration = new AtomicLong(0);
     private Timer timeoutTimer;
 
@@ -51,6 +52,9 @@ public class SocketManager {
     public void connect() {
         synchronized (this.socketLock) {
             if (this.socket.isConnected() || this.socket.isConnecting()) return;
+            if (this.runtimeMarkerLogged.compareAndSet(false, true)) {
+                this.antiVPN.getLog().error("AntiVPN API runtime marker: %s", SocketClient.apiRuntimeMarker());
+            }
             this.socket.connect();
             startTimeoutTask();
         }
