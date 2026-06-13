@@ -109,9 +109,7 @@ public class SocketClient extends WebSocketClient {
         // Defensive: Java-WebSocket may start the lost-connection timer during handshake.
         // Calling this here cancels any timer that was started with a stale/default timeout.
         this.setConnectionLostTimeout(0);
-        // Reset our self-managed keepalive clock so a fresh connection isn't immediately
-        // flagged as stale before the first JSON PONG arrives.
-        this.socketManager.markPongReceived();
+        this.socketManager.markConnected();
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
         this.antiVPN.getLog().debug("WebSocket handshake complete. Status: %d | Url: %s", handshake.getHttpStatus(), this.uri);
     }
@@ -124,8 +122,14 @@ public class SocketClient extends WebSocketClient {
         String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
         String initiator = remote ? "Server" : "Client";
 
-        this.antiVPN.getLog().debug("onClose triggered [initiator=%s, code=%d, rawReason=%s]", initiator, code, reason);
         this.antiVPN.getLog().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
+        if (code == 1006) {
+            StringBuilder origin = new StringBuilder();
+            for (StackTraceElement el : Thread.currentThread().getStackTrace()) {
+                origin.append("\n    at ").append(el.toString());
+            }
+            this.antiVPN.getLog().error("[DIAG] 1006 close origin [remote=%s, thread=%s]:%s", remote, Thread.currentThread().getName(), origin);
+        }
     }
 
     @Override

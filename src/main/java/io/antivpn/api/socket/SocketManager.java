@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 public class SocketManager {
     private final AntiVPN antiVPN;
@@ -30,17 +32,9 @@ public class SocketManager {
     @Setter
     private String shieldKick;
 
-    /**
-     * Timestamp (ms) of the last JSON PONG received from the server. Updated on every PONG and on
-     * a fresh connection open. Used by {@link SocketTimeoutTask} to detect half-open connections
-     * (TCP alive but server unreachable, common behind Cloudflare) that {@code isOpen()} cannot see.
-     */
     private volatile long lastPongTimestamp = System.currentTimeMillis();
-
-    /**
-     * Max time (ms) without a JSON PONG before the connection is considered dead and force-reconnected.
-     * Keepalive is sent every ~56s, so this allows ~2 missed PONGs before acting.
-     */
+    private volatile long connectedAt = System.currentTimeMillis();
+    private volatile long maxConnectionAgeMs = randomMaxConnectionAge();
     private static final long PONG_TIMEOUT_MS = 150_000L;
 
     public SocketManager(AntiVPN antiVPN, Duration cacheDuration) {
@@ -107,19 +101,27 @@ public class SocketManager {
         this.socket.send("{\"type\":\"PING\",\"nonce\":\"" + nonce + "\"}");
     }
 
-    /**
-     * Records that a JSON PONG (or a fresh connection) was just received, resetting the dead-connection clock.
-     */
     public void markPongReceived() {
         this.lastPongTimestamp = System.currentTimeMillis();
     }
 
-    /**
-     * @return true if no JSON PONG has been received within {@link #PONG_TIMEOUT_MS}, i.e. the
-     * connection is most likely half-open/dead even though {@code isOpen()} still reports true.
-     */
     public boolean isPongStale() {
         return (System.currentTimeMillis() - this.lastPongTimestamp) > PONG_TIMEOUT_MS;
+    }
+
+    public void markConnected() {
+        long now = System.currentTimeMillis();
+        this.connectedAt = now;
+        this.lastPongTimestamp = now;
+        this.maxConnectionAgeMs = randomMaxConnectionAge();
+    }
+
+    public boolean shouldRefreshConnection() {
+        return (System.currentTimeMillis() - this.connectedAt) >= this.maxConnectionAgeMs;
+    }
+
+    private static long randomMaxConnectionAge() {
+        return ThreadLocalRandom.current().nextLong(165_000L, 196_000L);
     }
 
 
@@ -133,19 +135,48 @@ public class SocketManager {
 
         if (!force && (this.socket.isConnecting() || this.isConnected())) return;
 
-        // Create a fresh SocketClient so no stale Java-WebSocket timer state survives.
         this.socket = initialize();
         if (this.socket == null) {
             this.antiVPN.getLog().error("Failed to initialize socket during reconnect.");
             return;
         }
 
-        // Reset the keepalive clock for the new connection so the stale-detection in
-        // SocketTimeoutTask doesn't immediately fire again while the handshake is in progress.
-        markPongReceived();
+        markConnected();
 
         this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
         this.socket.connect();
+    }
+
+    public void refreshConnection() {
+        SocketClient oldSocket = this.socket;
+        SocketClient newSocket = initialize();
+        if (newSocket == null) {
+            this.antiVPN.getLog().error("Failed to initialize socket during connection refresh.");
+            return;
+        }
+
+        try {
+            this.antiVPN.getLog().debug("Refreshing AntiVPN Server connection...");
+            if (!newSocket.connectBlocking(10, TimeUnit.SECONDS)) {
+                this.antiVPN.getLog().error("Timed out refreshing AntiVPN Server connection.");
+                newSocket.close();
+                return;
+            }
+
+            this.socket = newSocket;
+            markConnected();
+
+            if (oldSocket != null && oldSocket.isOpen()) {
+                oldSocket.close(CloseFrame.NORMAL, "Refreshing");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            newSocket.close();
+            this.antiVPN.getLog().error("Interrupted while refreshing AntiVPN Server connection.");
+        } catch (Exception e) {
+            newSocket.close();
+            this.antiVPN.getLog().error("Failed to refresh AntiVPN Server connection: %s", e.getMessage());
+        }
     }
 
     public Map<String, String> getHeaders() {
