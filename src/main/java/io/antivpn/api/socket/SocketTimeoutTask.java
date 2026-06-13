@@ -3,6 +3,7 @@ package io.antivpn.api.socket;
 import lombok.RequiredArgsConstructor;
 
 import java.util.TimerTask;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This code has been created by
@@ -16,6 +17,12 @@ public class SocketTimeoutTask extends TimerTask {
     private final SocketManager socketManager;
     private long tickCount = 0;
 
+    private long nextKeepAliveTick = randomKeepAliveDelay();
+
+    private static long randomKeepAliveDelay() {
+        return ThreadLocalRandom.current().nextInt(4, 8);
+    }
+
     @Override
     public void run() {
         this.socketManager.getSocketDataHandler().tick();
@@ -26,19 +33,16 @@ public class SocketTimeoutTask extends TimerTask {
             return;
         }
 
-        // Detect half-open connections: isConnected()/isOpen() still report true when the TCP link
-        // is alive but the server (or Cloudflare) silently stopped responding. Our JSON PONG clock
-        // is the only reliable signal, so force a reconnect when it goes stale.
         if (this.socketManager.isPongStale()) {
             this.socketManager.getSocket().getAntiVPN().getLog().error("SocketTimeoutTask: no JSON PONG received in time, connection is stale. Forcing reconnect. [tick=%d]", tickCount);
             this.socketManager.reconnect(true);
             return;
         }
 
-        // Only send keepalive every ~56s (8s interval × 7 ticks)
-        if (++tickCount % 7 == 0) {
+        if (++tickCount >= nextKeepAliveTick) {
             this.socketManager.getSocket().getAntiVPN().getLog().debug("SocketTimeoutTask: sending keepalive [tick=%d]", tickCount);
             this.socketManager.sendKeepAlive();
+            nextKeepAliveTick = tickCount + randomKeepAliveDelay();
         }
     }
 }

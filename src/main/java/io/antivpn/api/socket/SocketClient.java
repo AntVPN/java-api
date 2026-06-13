@@ -49,6 +49,9 @@ public class SocketClient extends WebSocketClient {
     @Override
     protected void startConnectionLostTimer() {
         // Intentionally empty: keepalive is fully self-managed via JSON PING/PONG.
+        // Proof-of-patch marker: if you see this line in the logs, the native watchdog is disabled
+        // and any subsequent 1006 "did not respond with a pong in time" can only come from OLD code.
+        this.antiVPN.getLog().debug("Native lost-connection watchdog suppressed; using self-managed JSON keepalive.");
     }
 
     @Override
