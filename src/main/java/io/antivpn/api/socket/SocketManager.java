@@ -30,6 +30,19 @@ public class SocketManager {
     @Setter
     private String shieldKick;
 
+    /**
+     * Timestamp (ms) of the last JSON PONG received from the server. Updated on every PONG and on
+     * a fresh connection open. Used by {@link SocketTimeoutTask} to detect half-open connections
+     * (TCP alive but server unreachable, common behind Cloudflare) that {@code isOpen()} cannot see.
+     */
+    private volatile long lastPongTimestamp = System.currentTimeMillis();
+
+    /**
+     * Max time (ms) without a JSON PONG before the connection is considered dead and force-reconnected.
+     * Keepalive is sent every ~56s, so this allows ~2 missed PONGs before acting.
+     */
+    private static final long PONG_TIMEOUT_MS = 150_000L;
+
     public SocketManager(AntiVPN antiVPN, Duration cacheDuration) {
         this.antiVPN = antiVPN;
         this.socket = initialize();
@@ -94,6 +107,21 @@ public class SocketManager {
         this.socket.send("{\"type\":\"PING\",\"nonce\":\"" + nonce + "\"}");
     }
 
+    /**
+     * Records that a JSON PONG (or a fresh connection) was just received, resetting the dead-connection clock.
+     */
+    public void markPongReceived() {
+        this.lastPongTimestamp = System.currentTimeMillis();
+    }
+
+    /**
+     * @return true if no JSON PONG has been received within {@link #PONG_TIMEOUT_MS}, i.e. the
+     * connection is most likely half-open/dead even though {@code isOpen()} still reports true.
+     */
+    public boolean isPongStale() {
+        return (System.currentTimeMillis() - this.lastPongTimestamp) > PONG_TIMEOUT_MS;
+    }
+
 
     public void reconnect() {
         reconnect(false);
@@ -111,6 +139,10 @@ public class SocketManager {
             this.antiVPN.getLog().error("Failed to initialize socket during reconnect.");
             return;
         }
+
+        // Reset the keepalive clock for the new connection so the stale-detection in
+        // SocketTimeoutTask doesn't immediately fire again while the handshake is in progress.
+        markPongReceived();
 
         this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
         this.socket.connect();

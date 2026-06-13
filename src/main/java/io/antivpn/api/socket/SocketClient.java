@@ -33,6 +33,29 @@ public class SocketClient extends WebSocketClient {
         this.setConnectionLostTimeout(0);
     }
 
+    /**
+     * Hard-disable Java-WebSocket's native lost-connection detection.
+     *
+     * Java-WebSocket's {@code WebSocketClient.onWebsocketOpen()} unconditionally calls
+     * {@code startConnectionLostTimer()} BEFORE our {@link #onOpen} runs and re-arms it on every
+     * reconnect, which is why {@code setConnectionLostTimeout(0)} alone was unreliable and we kept
+     * getting Code: 1006 "did not respond with a pong in time" disconnects. The server (behind
+     * Cloudflare) only speaks our JSON PING/PONG, never WebSocket control-frame PONGs, so the
+     * native watchdog always falsely flags the link as dead.
+     *
+     * Overriding this to a no-op guarantees the native timer can never start. We manage keepalive
+     * and dead-connection detection ourselves in {@code SocketTimeoutTask} / {@link SocketManager}.
+     */
+    @Override
+    protected void startConnectionLostTimer() {
+        // Intentionally empty: keepalive is fully self-managed via JSON PING/PONG.
+    }
+
+    @Override
+    public void onWebsocketPong(org.java_websocket.WebSocket conn, org.java_websocket.framing.Framedata f) {
+        // Native control-frame PONGs are not used; ignore them entirely.
+    }
+
     @Override
     public void onMessage(String message) {
         this.antiVPN.getLog().debug("Received message from the AntiVPN Server: %s", message);
@@ -65,6 +88,7 @@ public class SocketClient extends WebSocketClient {
                     break;
 
                 case "PONG":
+                    this.socketManager.markPongReceived();
                     this.antiVPN.getLog().debug("Received JSON PONG keepalive from server.");
                     break;
 
@@ -82,6 +106,9 @@ public class SocketClient extends WebSocketClient {
         // Defensive: Java-WebSocket may start the lost-connection timer during handshake.
         // Calling this here cancels any timer that was started with a stale/default timeout.
         this.setConnectionLostTimeout(0);
+        // Reset our self-managed keepalive clock so a fresh connection isn't immediately
+        // flagged as stale before the first JSON PONG arrives.
+        this.socketManager.markPongReceived();
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
         this.antiVPN.getLog().debug("WebSocket handshake complete. Status: %d | Url: %s", handshake.getHttpStatus(), this.uri);
     }
