@@ -29,7 +29,6 @@ public class SocketClient extends WebSocketListener {
     public static final String SOCKET_IMPLEMENTATION = "OkHttp";
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .pingInterval(20, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .build();
 
@@ -55,49 +54,6 @@ public class SocketClient extends WebSocketListener {
             builder.header(header.getKey(), header.getValue());
         }
         this.request = builder.build();
-    }
-
-    public static String runtimeFingerprint() {
-        try {
-            String source = SocketClient.class.getProtectionDomain().getCodeSource() == null
-                    ? "unknown"
-                    : String.valueOf(SocketClient.class.getProtectionDomain().getCodeSource().getLocation());
-            ClassLoader loader = SocketClient.class.getClassLoader();
-            return source + " | " + (loader == null ? "bootstrap" : loader.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(loader)));
-        } catch (Exception e) {
-            return "unknown";
-        }
-    }
-
-    public static String apiRuntimeMarker() {
-        return "version=" + API_VERSION
-                + " | socket=" + SOCKET_IMPLEMENTATION
-                + " | marker=" + API_MARKER
-                + " | javaWebSocketVisible=" + isClassVisible("org.java_websocket.client.WebSocketClient")
-                + " | javaWebSocketSource=" + classSource("org.java_websocket.client.WebSocketClient")
-                + " | okHttpVisible=" + isClassVisible("okhttp3.OkHttpClient")
-                + " | runtime=" + runtimeFingerprint();
-    }
-
-    private static boolean isClassVisible(String name) {
-        try {
-            Class.forName(name, false, SocketClient.class.getClassLoader());
-            return true;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    private static String classSource(String name) {
-        try {
-            Class<?> clazz = Class.forName(name, false, SocketClient.class.getClassLoader());
-            if (clazz.getProtectionDomain() == null || clazz.getProtectionDomain().getCodeSource() == null) {
-                return "unknown";
-            }
-            return String.valueOf(clazz.getProtectionDomain().getCodeSource().getLocation());
-        } catch (Throwable ignored) {
-            return "not-visible";
-        }
     }
 
     public void connect() {
@@ -160,8 +116,7 @@ public class SocketClient extends WebSocketListener {
         this.connecting.set(false);
         this.socketManager.markConnected();
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
-        this.antiVPN.getLog().debug("OkHttp WebSocket handshake complete. Status: %d | Url: %s | Runtime: %s", response.code(), this.uri, runtimeFingerprint());
-        this.antiVPN.getLog().debug("OkHttp protocol-level ping enabled. Interval: %dms", CLIENT.pingIntervalMillis());
+        this.antiVPN.getLog().debug("OkHttp WebSocket handshake complete. Status: %d | Url: %s", response.code(), this.uri);
         this.connectLatch.countDown();
     }
 
