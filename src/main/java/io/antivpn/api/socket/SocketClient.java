@@ -79,6 +79,9 @@ public class SocketClient extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshake) {
+        // Defensive: Java-WebSocket may start the lost-connection timer during handshake.
+        // Calling this here cancels any timer that was started with a stale/default timeout.
+        this.setConnectionLostTimeout(0);
         this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
         this.antiVPN.getLog().debug("WebSocket handshake complete. Status: %d | Url: %s", handshake.getHttpStatus(), this.uri);
     }
