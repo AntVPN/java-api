@@ -28,22 +28,15 @@ public class SocketTimeoutTask extends TimerTask {
         this.socketManager.getSocketDataHandler().tick();
 
         if (!this.socketManager.isConnected()) {
+            if (this.socketManager.getSocket().isConnecting()) return;
             this.socketManager.getSocket().getAntiVPN().getLog().debug("SocketTimeoutTask: socket not connected, triggering reconnect. [tick=%d]", tickCount);
             this.socketManager.reconnect();
             return;
         }
 
-        this.socketManager.getSocket().setConnectionLostTimeout(0);
-
         if (this.socketManager.isPongStale()) {
             this.socketManager.getSocket().getAntiVPN().getLog().error("SocketTimeoutTask: no JSON PONG received in time, connection is stale. Forcing reconnect. [tick=%d]", tickCount);
             this.socketManager.reconnect(true);
-            return;
-        }
-
-        if (this.socketManager.shouldRefreshConnection()) {
-            this.socketManager.getSocket().getAntiVPN().getLog().debug("SocketTimeoutTask: refreshing proxied connection before Cloudflare cutoff. [tick=%d]", tickCount);
-            this.socketManager.refreshConnection();
             return;
         }
 

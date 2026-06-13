@@ -3,64 +3,145 @@ package io.antivpn.api.socket;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.antivpn.api.AntiVPN;
-import lombok.Getter;
 import io.antivpn.api.model.response.CheckResponse;
 import io.antivpn.api.model.response.SettingsResponse;
 import io.antivpn.api.util.GsonParser;
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.enums.ReadyState;
-import org.java_websocket.handshake.ServerHandshake;
+import lombok.Getter;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.WebSocket;
+import okhttp3.WebSocketListener;
+import okio.ByteString;
 
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.channels.UnresolvedAddressException;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class SocketClient extends WebSocketClient {
+public class SocketClient extends WebSocketListener {
+    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
+            .pingInterval(0, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .build();
+
     private final SocketManager socketManager;
     @Getter
     private final AntiVPN antiVPN;
+    private final URI uri;
+    private final Request request;
+    private final long generation;
+    private volatile WebSocket webSocket;
+    private volatile CountDownLatch connectLatch = new CountDownLatch(1);
+    private final AtomicBoolean open = new AtomicBoolean(false);
+    private final AtomicBoolean connecting = new AtomicBoolean(false);
 
-    public SocketClient(SocketManager socketManager, AntiVPN antiVPN, URI serverUri, Map<String, String> httpHeaders) {
-        super(serverUri, httpHeaders);
+    public SocketClient(SocketManager socketManager, AntiVPN antiVPN, URI serverUri, Map<String, String> httpHeaders, long generation) {
         this.socketManager = socketManager;
         this.antiVPN = antiVPN;
-        this.setTcpNoDelay(true);
-        // Disable library-level ping/pong; we use our own JSON keepalive in SocketTimeoutTask.
-        // The server replies to JSON PINGs but not to WebSocket control-frame PINGs, which
-        // caused Code: 1006 "did not respond with a pong in time" disconnects.
-        this.setConnectionLostTimeout(0);
+        this.uri = serverUri;
+        this.generation = generation;
+
+        Request.Builder builder = new Request.Builder().url(serverUri.toString());
+        for (Map.Entry<String, String> header : httpHeaders.entrySet()) {
+            builder.header(header.getKey(), header.getValue());
+        }
+        this.request = builder.build();
     }
 
-    /**
-     * Hard-disable Java-WebSocket's native lost-connection detection.
-     *
-     * Java-WebSocket's {@code WebSocketClient.onWebsocketOpen()} unconditionally calls
-     * {@code startConnectionLostTimer()} BEFORE our {@link #onOpen} runs and re-arms it on every
-     * reconnect, which is why {@code setConnectionLostTimeout(0)} alone was unreliable and we kept
-     * getting Code: 1006 "did not respond with a pong in time" disconnects. The server (behind
-     * Cloudflare) only speaks our JSON PING/PONG, never WebSocket control-frame PONGs, so the
-     * native watchdog always falsely flags the link as dead.
-     *
-     * Overriding this to a no-op guarantees the native timer can never start. We manage keepalive
-     * and dead-connection detection ourselves in {@code SocketTimeoutTask} / {@link SocketManager}.
-     */
-    @Override
-    protected void startConnectionLostTimer() {
-        // Intentionally empty: keepalive is fully self-managed via JSON PING/PONG.
-        // Proof-of-patch marker: if you see this line in the logs, the native watchdog is disabled
-        // and any subsequent 1006 "did not respond with a pong in time" can only come from OLD code.
-        this.antiVPN.getLog().debug("Native lost-connection watchdog suppressed; using self-managed JSON keepalive.");
+    public static String runtimeFingerprint() {
+        try {
+            String source = SocketClient.class.getProtectionDomain().getCodeSource() == null
+                    ? "unknown"
+                    : String.valueOf(SocketClient.class.getProtectionDomain().getCodeSource().getLocation());
+            ClassLoader loader = SocketClient.class.getClassLoader();
+            return source + " | " + (loader == null ? "bootstrap" : loader.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(loader)));
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
+    public void connect() {
+        if (this.open.get() || this.connecting.getAndSet(true)) return;
+        this.connectLatch = new CountDownLatch(1);
+        this.webSocket = CLIENT.newWebSocket(this.request, this);
+    }
+
+    public boolean connectBlocking(long timeout, TimeUnit timeUnit) throws InterruptedException {
+        connect();
+        return this.connectLatch.await(timeout, timeUnit) && this.isConnected();
+    }
+
+    public void send(String text) {
+        WebSocket socket = this.webSocket;
+        if (socket != null) {
+            socket.send(text);
+        }
+    }
+
+    public void send(byte[] bytes) {
+        WebSocket socket = this.webSocket;
+        if (socket != null) {
+            socket.send(ByteString.of(bytes));
+        }
+    }
+
+    public void close() {
+        close(1000, "Closing");
+    }
+
+    public void close(int code, String reason) {
+        WebSocket socket = this.webSocket;
+        if (socket != null) {
+            socket.close(code, reason);
+        }
+    }
+
+    public boolean isOpen() {
+        return this.open.get();
+    }
+
+    public boolean isConnected() {
+        return this.open.get();
+    }
+
+    public boolean isConnecting() {
+        return this.connecting.get() && !this.open.get();
     }
 
     @Override
-    public void onWebsocketPong(org.java_websocket.WebSocket conn, org.java_websocket.framing.Framedata f) {
-        // Native control-frame PONGs are not used; ignore them entirely.
+    public void onOpen(WebSocket webSocket, Response response) {
+        if (!this.socketManager.isCurrent(this, this.generation)) {
+            webSocket.close(1000, "Replaced");
+            return;
+        }
+
+        this.webSocket = webSocket;
+        this.open.set(true);
+        this.connecting.set(false);
+        this.socketManager.markConnected();
+        this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
+        this.antiVPN.getLog().debug("OkHttp WebSocket handshake complete. Status: %d | Url: %s | Runtime: %s", response.code(), this.uri, runtimeFingerprint());
+        this.connectLatch.countDown();
     }
 
     @Override
-    public void onMessage(String message) {
+    public void onMessage(WebSocket webSocket, String text) {
+        if (!this.socketManager.isCurrent(this, this.generation)) return;
+        handleMessage(text);
+    }
+
+    @Override
+    public void onMessage(WebSocket webSocket, ByteString bytes) {
+        if (!this.socketManager.isCurrent(this, this.generation)) return;
+        handleMessage(bytes.utf8());
+    }
+
+    private void handleMessage(String message) {
         this.antiVPN.getLog().debug("Received message from the AntiVPN Server: %s", message);
         try {
             JsonObject object = GsonParser.parse(message);
@@ -76,7 +157,6 @@ public class SocketClient extends WebSocketClient {
             switch (type) {
                 case "SETTINGS":
                     JsonObject settingsObject = object.getAsJsonObject("settings");
-                    // Use the already parsed JsonObject instead of a String
                     SettingsResponse response = GsonParser.fromJson(settingsObject, SettingsResponse.class);
 
                     this.socketManager.setResponseKick(response.getKickMessage().replace("\r", ""));
@@ -85,7 +165,6 @@ public class SocketClient extends WebSocketClient {
                     break;
 
                 case "VERIFY":
-                    // Avoid parsing the full string a second time, pass the JsonObject directly
                     CheckResponse checkResponse = GsonParser.fromJson(object, CheckResponse.class);
                     this.socketManager.getSocketDataHandler().handle(checkResponse);
                     break;
@@ -105,68 +184,50 @@ public class SocketClient extends WebSocketClient {
     }
 
     @Override
-    public void onOpen(ServerHandshake handshake) {
-        // Defensive: Java-WebSocket may start the lost-connection timer during handshake.
-        // Calling this here cancels any timer that was started with a stale/default timeout.
-        this.setConnectionLostTimeout(0);
-        this.socketManager.markConnected();
-        this.antiVPN.getLog().fine("Connected to the AntiVPN Server.");
-        this.antiVPN.getLog().debug("WebSocket handshake complete. Status: %d | Url: %s", handshake.getHttpStatus(), this.uri);
+    public void onClosing(WebSocket webSocket, int code, String reason) {
+        webSocket.close(code, reason);
     }
 
     @Override
-    public void onClose(int code, String reason, boolean remote) {
-        // Halt any leftover connection-lost timer so it cannot fire on a reused/recreated socket.
-        this.setConnectionLostTimeout(0);
-
-        String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
-        String initiator = remote ? "Server" : "Client";
-
-        this.antiVPN.getLog().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
-        if (code == 1006) {
-            StringBuilder origin = new StringBuilder();
-            for (StackTraceElement el : Thread.currentThread().getStackTrace()) {
-                origin.append("\n    at ").append(el.toString());
-            }
-            this.antiVPN.getLog().error("[DIAG] 1006 close origin [remote=%s, thread=%s]:%s", remote, Thread.currentThread().getName(), origin);
-        }
+    public void onClosed(WebSocket webSocket, int code, String reason) {
+        this.open.set(false);
+        this.connecting.set(false);
+        this.connectLatch.countDown();
+        if (!this.socketManager.isCurrent(this, this.generation)) return;
+        logClose(code, reason, true);
     }
 
     @Override
-    public void onError(Exception e) {
+    public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+        this.open.set(false);
+        this.connecting.set(false);
+        this.connectLatch.countDown();
+        if (!this.socketManager.isCurrent(this, this.generation)) return;
+        onError(t);
+        logClose(1006, t.getMessage(), false);
+    }
+
+    private void onError(Throwable e) {
         String errorMsg;
 
-        // Specific handling of common network errors for better console clarity
         if (e instanceof ConnectException) {
             errorMsg = "Connection refused. The AntiVPN socket server might be offline or blocked by a firewall.";
         } else if (e instanceof UnknownHostException || e instanceof UnresolvedAddressException) {
             errorMsg = "Unknown host. Please check your server URI or DNS settings.";
         } else {
             errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            // Only print the stacktrace if it's an unexpected error
             e.printStackTrace();
         }
 
         this.antiVPN.getLog().error("Socket connection error: %s", errorMsg);
     }
 
-    /**
-     * Returns true if the socket is currently in the process of connecting.
-     */
-    public boolean isConnecting() {
-        return this.getReadyState() == ReadyState.NOT_YET_CONNECTED;
+    private void logClose(int code, String reason, boolean remote) {
+        String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
+        String initiator = remote ? "Server" : "Client";
+        this.antiVPN.getLog().error("Disconnected from AntiVPN Server [%s]. (Code: %d, Reason: %s)", initiator, code, readableReason);
     }
 
-    /**
-     * Returns true if the socket is fully connected and open.
-     */
-    public boolean isConnected() {
-        return this.isOpen(); // isOpen() safely validates the state
-    }
-
-    /**
-     * Translates standard WebSocket close codes to human-readable text.
-     */
     private String getReadableCloseReason(int code) {
         switch (code) {
             case 1000: return "Normal Closure";

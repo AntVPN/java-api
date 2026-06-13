@@ -5,17 +5,14 @@ import io.antivpn.api.socket.handler.SocketDataHandler;
 import io.antivpn.api.util.IDGenerator;
 import lombok.Getter;
 import lombok.Setter;
-import org.java_websocket.framing.CloseFrame;
 
 import java.net.URI;
-import java.net.http.WebSocketHandshakeException;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class SocketManager {
     private final AntiVPN antiVPN;
@@ -23,6 +20,10 @@ public class SocketManager {
     private SocketClient socket;
     @Getter
     private final SocketDataHandler socketDataHandler;
+    private final Object socketLock = new Object();
+    private final AtomicBoolean reconnecting = new AtomicBoolean(false);
+    private final AtomicLong socketGeneration = new AtomicLong(0);
+    private Timer timeoutTimer;
 
     @Getter
     @Setter
@@ -33,8 +34,6 @@ public class SocketManager {
     private String shieldKick;
 
     private volatile long lastPongTimestamp = System.currentTimeMillis();
-    private volatile long connectedAt = System.currentTimeMillis();
-    private volatile long maxConnectionAgeMs = randomMaxConnectionAge();
     private static final long PONG_TIMEOUT_MS = 150_000L;
 
     public SocketManager(AntiVPN antiVPN, Duration cacheDuration) {
@@ -50,43 +49,40 @@ public class SocketManager {
     }
 
     public void connect() {
-        if (this.isConnected()) return;
-        this.socket.connect();
-        Timer timer = new Timer(antiVPN.getPluginName() + " - Socket Timeout Checker");
-        timer.scheduleAtFixedRate(new SocketTimeoutTask(this), 0, 8000);
+        synchronized (this.socketLock) {
+            if (this.socket.isConnected() || this.socket.isConnecting()) return;
+            this.socket.connect();
+            startTimeoutTask();
+        }
     }
 
     /**
      * Closing the socket.
      */
     public void close() {
-        if (!this.isConnected()) return;
-        this.socket.close(CloseFrame.NORMAL, "Closing");
+        synchronized (this.socketLock) {
+            stopTimeoutTask();
+            if (!this.isConnected()) return;
+            this.socket.close(1000, "Closing");
+        }
     }
 
     private SocketClient initialize() {
-        try {
-            var connection_url = URI.create(this.antiVPN.getAntiVPNConfig().getEndpoint());
+        var connection_url = URI.create(this.antiVPN.getAntiVPNConfig().getEndpoint());
+        Map<String, String> httpHeaders = getHeaders();
+        return new SocketClient(this, this.antiVPN, connection_url, httpHeaders, this.socketGeneration.incrementAndGet());
+    }
 
-            Map<String, String> httpHeaders = getHeaders();
-            return new SocketClient(this, this.antiVPN, connection_url, httpHeaders);
-        } catch (CompletionException ex) {
-            if (!(ex.getCause() instanceof WebSocketHandshakeException)) return null;
+    private void startTimeoutTask() {
+        if (this.timeoutTimer != null) return;
+        this.timeoutTimer = new Timer(antiVPN.getPluginName() + " - Socket Timeout Checker", true);
+        this.timeoutTimer.scheduleAtFixedRate(new SocketTimeoutTask(this), 8000, 8000);
+    }
 
-            WebSocketHandshakeException throwable = (WebSocketHandshakeException) ex.getCause();
-            int statusCode = throwable.getResponse().statusCode();
-
-            if (statusCode == 401) {
-                this.antiVPN.getLog().error("Failed to authenticate with the server, please check your secret in the config.json file.");
-            } else if (statusCode >= 500 && statusCode <= 505) {
-                this.antiVPN.getLog().error("Our server is restarting or something related... If this still happening after 10 minutes please report it on discord.snake.rip. Useful data: (HttpStatus: %s)", statusCode);
-            } else {
-                this.antiVPN.getLog().error("Report this to the developer: %s", throwable.getClass().getSimpleName());
-                throwable.printStackTrace();
-            }
-
-            return null;
-        }
+    private void stopTimeoutTask() {
+        if (this.timeoutTimer == null) return;
+        this.timeoutTimer.cancel();
+        this.timeoutTimer = null;
     }
 
     public boolean isConnected() {
@@ -111,17 +107,12 @@ public class SocketManager {
 
     public void markConnected() {
         long now = System.currentTimeMillis();
-        this.connectedAt = now;
         this.lastPongTimestamp = now;
-        this.maxConnectionAgeMs = randomMaxConnectionAge();
+        this.reconnecting.set(false);
     }
 
-    public boolean shouldRefreshConnection() {
-        return (System.currentTimeMillis() - this.connectedAt) >= this.maxConnectionAgeMs;
-    }
-
-    private static long randomMaxConnectionAge() {
-        return ThreadLocalRandom.current().nextLong(165_000L, 196_000L);
+    public boolean isCurrent(SocketClient socketClient, long generation) {
+        return this.socket == socketClient && this.socketGeneration.get() == generation;
     }
 
 
@@ -130,52 +121,20 @@ public class SocketManager {
     }
 
     public void reconnect(boolean force) {
-        this.antiVPN.getLog().log("Closing the AntiVPN Server connection...");
-        this.socket.close();
+        synchronized (this.socketLock) {
+            if (!force && (this.socket.isConnecting() || this.isConnected())) return;
+            if (!this.reconnecting.compareAndSet(false, true)) return;
 
-        if (!force && (this.socket.isConnecting() || this.isConnected())) return;
+            SocketClient oldSocket = this.socket;
+            this.antiVPN.getLog().log("Closing the AntiVPN Server connection...");
+            oldSocket.close();
 
-        this.socket = initialize();
-        if (this.socket == null) {
-            this.antiVPN.getLog().error("Failed to initialize socket during reconnect.");
-            return;
-        }
-
-        markConnected();
-
-        this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
-        this.socket.connect();
-    }
-
-    public void refreshConnection() {
-        SocketClient oldSocket = this.socket;
-        SocketClient newSocket = initialize();
-        if (newSocket == null) {
-            this.antiVPN.getLog().error("Failed to initialize socket during connection refresh.");
-            return;
-        }
-
-        try {
-            this.antiVPN.getLog().debug("Refreshing AntiVPN Server connection...");
-            if (!newSocket.connectBlocking(10, TimeUnit.SECONDS)) {
-                this.antiVPN.getLog().error("Timed out refreshing AntiVPN Server connection.");
-                newSocket.close();
-                return;
-            }
-
-            this.socket = newSocket;
+            this.socket = initialize();
             markConnected();
 
-            if (oldSocket != null && oldSocket.isOpen()) {
-                oldSocket.close(CloseFrame.NORMAL, "Refreshing");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            newSocket.close();
-            this.antiVPN.getLog().error("Interrupted while refreshing AntiVPN Server connection.");
-        } catch (Exception e) {
-            newSocket.close();
-            this.antiVPN.getLog().error("Failed to refresh AntiVPN Server connection: %s", e.getMessage());
+            this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
+            this.socket.connect();
+            startTimeoutTask();
         }
     }
 

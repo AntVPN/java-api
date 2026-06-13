@@ -6,7 +6,7 @@
 
     <groupId>io.antivpn</groupId>
     <artifactId>serverantivpn-api</artifactId>
-    <version>1.1.6-RELEASE</version>
+    <version>1.1.7-RELEASE</version>
 
     <properties>
         <java.version>17</java.version>
@@ -71,6 +71,14 @@
                                     <pattern>com.google.thirdparty</pattern>
                                     <shadedPattern>io.antivpn.libs.external.google.thirdparty</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>okhttp3</pattern>
+                                    <shadedPattern>io.antivpn.libs.external.okhttp3</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>okio</pattern>
+                                    <shadedPattern>io.antivpn.libs.external.okio</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
@@ -88,9 +96,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.java-websocket</groupId>
-            <artifactId>Java-WebSocket</artifactId>
-            <version>1.6.0</version>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
