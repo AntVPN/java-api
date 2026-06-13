@@ -18,7 +18,7 @@ import java.util.concurrent.CompletionException;
 public class SocketManager {
     private final AntiVPN antiVPN;
     @Getter
-    private final SocketClient socket;
+    private SocketClient socket;
     @Getter
     private final SocketDataHandler socketDataHandler;
 
@@ -105,11 +105,15 @@ public class SocketManager {
 
         if (!force && (this.socket.isConnecting() || this.isConnected())) return;
 
-        this.socket.clearHeaders();
-        getHeaders().forEach(this.socket::addHeader);
+        // Create a fresh SocketClient so no stale Java-WebSocket timer state survives.
+        this.socket = initialize();
+        if (this.socket == null) {
+            this.antiVPN.getLog().error("Failed to initialize socket during reconnect.");
+            return;
+        }
 
         this.antiVPN.getLog().error("Reconnecting to the AntiVPN Server...");
-        this.socket.reconnect();
+        this.socket.connect();
     }
 
     public Map<String, String> getHeaders() {

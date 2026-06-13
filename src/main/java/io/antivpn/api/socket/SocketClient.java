@@ -88,6 +88,9 @@ public class SocketClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
+        // Halt any leftover connection-lost timer so it cannot fire on a reused/recreated socket.
+        this.setConnectionLostTimeout(0);
+
         String readableReason = (reason == null || reason.isEmpty()) ? getReadableCloseReason(code) : reason;
         String initiator = remote ? "Server" : "Client";
 
